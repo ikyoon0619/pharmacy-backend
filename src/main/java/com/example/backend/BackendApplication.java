@@ -14,13 +14,13 @@ public class BackendApplication {
 
 
     }
-    @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/greeting").allowedOrigins("http://localhost:80");
-            }
-        };
-    }
+//    @Bean
+//    public WebMvcConfigurer corsConfigurer() {
+//        return new WebMvcConfigurer() {
+//            @Override
+//            public void addCorsMappings(CorsRegistry registry) {
+//                registry.addMapping("/greeting").allowedOrigins("http://localhost:80");
+//            }
+//        };
+//    }
 }
