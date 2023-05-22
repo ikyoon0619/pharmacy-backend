@@ -6,10 +6,10 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Getter
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
+//@Getter
+//@Builder
+//@AllArgsConstructor
+//@NoArgsConstructor
 public class DocumentDto {
 
     @JsonProperty("place_name")
