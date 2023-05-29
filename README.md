@@ -1,5 +1,5 @@
-# pharmacy-backend
-Last project의 backend 서버입니다.
+## pharmacy-backend
+약국추천 서비스 backend 입니다
 
 # Tech Stack  
 JDK 11  
