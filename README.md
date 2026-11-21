@@ -2,7 +2,7 @@
 
 주소를 입력하면 **반경 10km 안에서 가장 가까운 약국 3곳**과 카카오맵 길안내·로드뷰 링크를 알려 주는 Spring Boot 서비스입니다.
 
-**데모:** https://<RENDER-URL>.onrender.com
+**데모:** https://pharmacy-ikyoon.onrender.com
 > 무료 서버라서 15분 동안 접속이 없으면 잠듭니다. 첫 접속은 30초~1분쯤 걸릴 수 있어요.
 
 ## 화면 흐름
