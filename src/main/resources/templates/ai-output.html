@@ -1,42 +1,35 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AI 약국 검색 결과</title>
-    <link rel="stylesheet" th:href="@{/css/style.css}">
-</head>
+<head th:replace="~{fragments :: head('AI 검색 결과 · 약국찾기')}"></head>
 <body>
+<header th:replace="~{fragments :: header}"></header>
+
 <main class="container">
-    <h1>AI 검색 결과</h1>
-    <p class="desc">질문: <strong th:text="${query}">강남역 근처 약국 찾아줘</strong></p>
+    <!-- 결과 화면에서도 바로 다시 물어볼 수 있게 검색칸을 위에 둔다 -->
+    <form action="/ai-search" method="post" class="search-box compact" data-loading="찾는 중…" data-status="ai-status">
+        <label for="query" class="sr-only">다시 묻기</label>
+        <input type="text" id="query" name="query" required maxlength="200" autocomplete="off" th:value="${query}">
+        <button type="submit" class="btn btn-primary btn-search" data-label="다시 찾기"><span class="label">다시 찾기</span></button>
+    </form>
+    <p class="status" id="ai-status" hidden role="status">
+        <span class="spinner" aria-hidden="true"></span> AI가 다시 찾고 있어요.
+    </p>
 
     <!-- th:text 는 HTML 을 이스케이프한다. AI 답변을 그대로 넣어도 스크립트가 실행되지 않는다 -->
-    <div class="answer" th:text="${answer}">AI 안내 문장</div>
+    <section class="answer" aria-label="AI 안내">
+        <span class="answer-badge">AI</span>
+        <p th:text="${answer}">AI 안내 문장</p>
+    </section>
 
-    <table th:unless="${#lists.isEmpty(outputs)}">
-        <thead>
-        <tr>
-            <th>약국명</th>
-            <th>주소</th>
-            <th>거리</th>
-            <th>길안내</th>
-            <th>로드뷰</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="o : ${outputs}">
-            <td th:text="${o.pharmacyName}">약국</td>
-            <td th:text="${o.pharmacyAddress}">주소</td>
-            <td th:text="${o.distance}">0 km</td>
-            <td><a th:href="${o.directionUrl}" target="_blank">길안내</a></td>
-            <td><a th:href="${o.roadViewUrl}" target="_blank">로드뷰</a></td>
-        </tr>
-        </tbody>
-    </table>
+    <section th:unless="${#lists.isEmpty(outputs)}">
+        <h2 class="section-title">가까운 약국 <span th:text="${#lists.size(outputs)}">3</span>곳</h2>
+        <ol th:replace="~{fragments :: pharmacy-list}"></ol>
+    </section>
 
-    <p class="hint">약국 목록은 카카오 지도 검색 결과입니다. 영업시간은 확인되지 않으니 방문 전에 전화로 확인해 주세요.</p>
-    <a href="/" class="back">다시 검색</a>
+    <a href="/" class="back">← 처음으로</a>
 </main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
+<script th:replace="~{fragments :: loading-script}"></script>
 </body>
 </html>

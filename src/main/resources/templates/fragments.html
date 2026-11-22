@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!-- 여러 화면이 같이 쓰는 조각들. th:replace="~{fragments :: 이름}" 으로 끼워 넣는다 -->
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title}">약국 찾기</title>
+    <meta name="description" content="문장으로 물어보면 AI가 가까운 약국과 길안내를 찾아 드려요.">
+    <meta name="theme-color" content="#0f9d76">
+    <link rel="icon" th:href="@{/favicon.svg}" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<header th:fragment="header" class="site-header">
+    <a href="/" class="brand" aria-label="처음으로">
+        <span class="brand-mark" aria-hidden="true">+</span>
+        <span>약국찾기</span>
+    </a>
+</header>
+
+<!-- 약국 카드 목록. outputs: List<OutputDto> -->
+<ol th:fragment="pharmacy-list" class="pharmacy-list">
+    <li th:each="o, stat : ${outputs}" class="pharmacy">
+        <div class="pharmacy-top">
+            <span class="rank" th:text="${stat.count}">1</span>
+            <div class="pharmacy-info">
+                <h3>
+                    <a th:if="${o.placeUrl}" th:href="${o.placeUrl}" target="_blank" rel="noopener"
+                       th:text="${o.pharmacyName}">온누리약국</a>
+                    <span th:unless="${o.placeUrl}" th:text="${o.pharmacyName}">온누리약국</span>
+                </h3>
+                <p class="address" th:text="${o.pharmacyAddress}">서울 강남구 역삼동</p>
+            </div>
+            <span class="distance" th:text="${o.distance}">180m</span>
+        </div>
+        <div class="actions">
+            <a th:href="${o.directionUrl}" target="_blank" rel="noopener" class="btn btn-primary">길안내</a>
+            <a th:if="${o.phone}" th:href="${o.telLink()}" class="btn" th:attr="aria-label=${o.pharmacyName + ' 전화 걸기'}">
+                전화 <span class="phone" th:text="${o.phone}">02-000-0000</span>
+            </a>
+            <a th:href="${o.roadViewUrl}" target="_blank" rel="noopener" class="btn btn-ghost">로드뷰</a>
+        </div>
+    </li>
+</ol>
+
+<footer th:fragment="footer" class="site-footer">
+    <p>약국 정보는 카카오 지도 검색 결과예요. 영업시간은 바뀔 수 있으니 방문 전에 전화로 확인해 주세요.</p>
+    <p>
+        <a href="https://github.com/ikyoon0619/pharmacy-backend" target="_blank" rel="noopener">GitHub</a>
+        · Spring Boot · Claude Tool Use · Kakao Local API
+    </p>
+</footer>
+
+<!-- 폼을 보내면 버튼을 잠그고 "찾는 중" 표시. 두 번 눌러 요청이 두 번 가는 것도 막는다 -->
+<script th:fragment="loading-script">
+    document.querySelectorAll("form[data-loading]").forEach(function (form) {
+        form.addEventListener("submit", function () {
+            var button = form.querySelector("button[type=submit]");
+            if (button) {
+                button.disabled = true;
+                button.classList.add("is-loading");
+                button.querySelector(".label").textContent = form.dataset.loading;
+            }
+            var status = document.getElementById(form.dataset.status);
+            if (status) status.hidden = false;
+        });
+    });
+    // 뒤로 가기로 돌아왔을 때 버튼이 잠긴 채로 남지 않게
+    window.addEventListener("pageshow", function (e) {
+        if (!e.persisted) return;
+        document.querySelectorAll("button.is-loading").forEach(function (b) {
+            b.disabled = false; b.classList.remove("is-loading");
+            b.querySelector(".label").textContent = b.dataset.label;
+        });
+        document.querySelectorAll(".status").forEach(function (s) { s.hidden = true; });
+    });
+</script>
+</body>
+</html>

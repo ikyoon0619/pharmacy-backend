@@ -1,24 +1,148 @@
+/* ---------- 색, 간격 (한 곳에서 바꾸면 전체가 바뀐다) ---------- */
+:root {
+    --bg: #f4f7f6;
+    --surface: #ffffff;
+    --text: #17201d;
+    --muted: #5d6b66;
+    --line: #e3e9e7;
+    --brand: #0f9d76;        /* 약국 초록 */
+    --brand-dark: #0b7d5e;
+    --brand-soft: #e6f5f0;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(16, 24, 20, .05), 0 4px 16px rgba(16, 24, 20, .06);
+}
+
 * { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: #f6f7f9; color: #222; }
-.container { max-width: 860px; margin: 48px auto; padding: 0 16px; }
-h1 { font-size: 28px; margin-bottom: 8px; }
-.desc { color: #555; margin-bottom: 24px; }
-.search-form { display: flex; gap: 8px; }
-.search-form input { flex: 1; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; background: #fff; }
-.search-form button { padding: 12px 20px; font-size: 16px; border: 0; border-radius: 8px; background: #2f6fed; color: #fff; cursor: pointer; }
-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
-th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 15px; }
-th { background: #f0f3f8; }
-a { color: #2f6fed; }
-.back { display: inline-block; margin-top: 24px; }
-.empty { padding: 16px; background: #fff; border-radius: 8px; }
-.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.card h2 { font-size: 18px; margin: 0 0 12px; }
-.badge { font-size: 12px; background: #eef3ff; color: #2f6fed; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
-.search-form .text-input { cursor: text; }
-.hint { color: #666; font-size: 14px; margin: 10px 0 0; }
-.answer { white-space: pre-line; background: #fff; border-left: 4px solid #2f6fed; border-radius: 8px; padding: 16px; margin-bottom: 20px; line-height: 1.6; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+    margin: 0;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    word-break: keep-all;    /* 한글이 단어 중간에서 줄바꿈되지 않게 */
+}
+a { color: var(--brand-dark); }
+:focus-visible { outline: 3px solid rgba(15, 157, 118, .45); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.container { max-width: 760px; margin: 0 auto; padding: 8px 16px 48px; }
+
+/* ---------- 머리글 / 바닥글 ---------- */
+.site-header { max-width: 760px; margin: 0 auto; padding: 18px 16px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; color: var(--text); text-decoration: none; }
+.brand-mark {
+    display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+    background: var(--brand); color: #fff; font-size: 22px; font-weight: 800; line-height: 1;
+}
+.site-footer { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
+.site-footer p { margin: 4px 0; }
+.site-footer a { color: var(--muted); }
+
+/* ---------- 첫 화면 ---------- */
+.hero { padding: 28px 0 20px; }
+.hero h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.2; margin: 0 0 12px; letter-spacing: -0.02em; }
+.lead { color: var(--muted); font-size: 17px; margin: 0; max-width: 560px; }
+
+.panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px 20px 20px; }
+
+/* 탭: 라디오 버튼은 숨기고 label 을 탭처럼 보이게 한다 */
+.tabs { display: flex; flex-wrap: wrap; }
+.tabs > input { position: absolute; opacity: 0; pointer-events: none; }
+.tabs > label {
+    padding: 12px 4px; margin-right: 20px; font-weight: 700; color: var(--muted);
+    border-bottom: 3px solid transparent; cursor: pointer;
+}
+.tabs > input:checked + label { color: var(--text); border-color: var(--brand); }
+.tabs > input:focus-visible + label { outline: 3px solid rgba(15, 157, 118, .45); }
+.tab-panel { display: none; width: 100%; padding-top: 16px; border-top: 1px solid var(--line); margin-top: -1px; }
+#tab-ai:checked ~ #panel-ai,
+#tab-addr:checked ~ #panel-addr { display: block; }
+
+.search-box { display: flex; gap: 8px; }
+.search-box input {
+    flex: 1; min-width: 0; padding: 14px 16px; font: inherit; font-size: 16px;
+    border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: var(--text);
+}
+.search-box input:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 4px var(--brand-soft); }
+#address { cursor: pointer; }
+.search-box.compact { margin: 8px 0 4px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip {
+    font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: #fafcfb; color: var(--text);
+}
+.chip:hover { border-color: var(--brand); color: var(--brand-dark); }
+.hint { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
+
+.status { display: flex; align-items: center; gap: 8px; color: var(--brand-dark); font-size: 14px; margin: 12px 0 0; }
+.status[hidden] { display: none; }
+.spinner {
+    width: 16px; height: 16px; border-radius: 50%; flex: none;
+    border: 2px solid var(--brand-soft); border-top-color: var(--brand); animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.steps { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.steps li { background: transparent; border: 1px dashed #cbd8d3; border-radius: 12px; padding: 14px; font-size: 14px; color: var(--muted); }
+.steps strong { display: block; color: var(--text); margin-bottom: 2px; }
+
+/* ---------- 버튼 ---------- */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 14px; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600;
+    border: 1px solid var(--line); background: #fff; color: var(--text); text-decoration: none; cursor: pointer;
+    min-height: 44px;  /* 손가락으로 누르기 좋은 크기 */
+}
+.btn:hover { border-color: #c5d3ce; }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+.btn-ghost { background: transparent; color: var(--muted); }
+.btn-search { padding: 0 22px; font-size: 16px; white-space: nowrap; }
+.btn:disabled { opacity: .7; cursor: progress; }
+
+/* ---------- 결과 ---------- */
+.answer {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px; margin: 16px 0 24px;
+}
+.answer p { margin: 0; white-space: pre-line; }
+.answer-badge {
+    flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--brand-soft); color: var(--brand-dark); font-size: 12px; font-weight: 800;
+}
+.eyebrow { margin: 16px 0 4px; color: var(--brand-dark); font-weight: 700; font-size: 14px; }
+.page-title { font-size: 24px; margin: 0 0 20px; }
+.section-title { font-size: 17px; margin: 0 0 12px; }
+
+.pharmacy-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.pharmacy { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+.pharmacy-top { display: flex; gap: 12px; align-items: flex-start; }
+.rank {
+    flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+    background: var(--brand-soft); color: var(--brand-dark); font-weight: 800; font-size: 14px;
+}
+.pharmacy-info { flex: 1; min-width: 0; }
+.pharmacy h3 { margin: 0; font-size: 17px; }
+.pharmacy h3 a { color: var(--text); text-decoration: none; }
+.pharmacy h3 a:hover { text-decoration: underline; }
+.address { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.distance { flex: none; font-weight: 800; color: var(--brand-dark); font-size: 15px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-left: 40px; }
+.phone { font-weight: 400; color: var(--muted); font-size: 14px; }
+
+.empty { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; margin: 16px 0 20px; }
+.empty strong { font-size: 18px; }
+.empty p { color: var(--muted); margin: 6px 0 0; }
+.back { display: inline-block; margin-top: 24px; font-weight: 600; text-decoration: none; }
+
+/* ---------- 휴대폰 ---------- */
 @media (max-width: 600px) {
-    .search-form { flex-direction: column; }
-    th:nth-child(2), td:nth-child(2) { display: none; }
+    .panel { padding: 4px 16px 16px; }
+    .steps { grid-template-columns: 1fr; }
+    .actions { padding-left: 0; }
+    .actions .btn { flex: 1; }
+    .phone { display: none; }  /* 좁은 화면에서는 "전화" 버튼만 */
 }

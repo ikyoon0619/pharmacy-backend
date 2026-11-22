@@ -43,7 +43,8 @@ class AiSearchControllerTest {
         given(usageLimiter.tryAcquire("203.0.113.7")).willReturn(true);
         given(aiSearchService.search("강남역 근처 약국")).willReturn(new AiSearchResult("3곳을 찾았어요.", List.of(d)));
         given(directionService.toOutput(d)).willReturn(
-                new OutputDto("온누리약국", "서울 강남구", "0.21 km", "/dir/1", "https://map.kakao.com/link/roadview/1,2"));
+                new OutputDto("온누리약국", "서울 강남구", "210m", "/dir/1",
+                        "https://map.kakao.com/link/roadview/1,2", "02-555-0100", null));
 
         mockMvc.perform(post("/ai-search").param("query", "  강남역 근처 약국 ")
                         .header("X-Forwarded-For", "203.0.113.7, 10.0.0.1"))
@@ -51,7 +52,8 @@ class AiSearchControllerTest {
                 .andExpect(view().name("ai-output"))
                 .andExpect(model().attribute("answer", "3곳을 찾았어요."))
                 .andExpect(model().attribute("outputs", hasSize(1)))
-                .andExpect(content().string(containsString("온누리약국")));
+                .andExpect(content().string(containsString("온누리약국")))
+                .andExpect(content().string(containsString("tel:02-555-0100")));
     }
 
     @Test
