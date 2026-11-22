@@ -55,10 +55,33 @@ public class KakaoSearchService {
                 .body(KakaoApiResponseDto.class);
     }
 
+    // 3) 장소 이름(예: "강남역", "서울시청") -> 좌표. 주소 검색으로 못 찾는 랜드마크용.
+    //    AI 자연어 검색에서 쓴다. 가장 정확한 1건만 받는다.
+    @Retryable(retryFor = {ResourceAccessException.class, HttpServerErrorException.class},
+            maxAttempts = 3, backoff = @Backoff(delay = 500))
+    public KakaoApiResponseDto searchKeyword(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+        return kakaoRestClient.get()
+                .uri(uri -> uri.path("/v2/local/search/keyword.json")
+                        .queryParam("query", keyword)
+                        .queryParam("size", 1)
+                        .build())
+                .retrieve()
+                .body(KakaoApiResponseDto.class);
+    }
+
     // 재시도를 다 써도 실패하거나 4xx 오류면 여기로 온다. 화면에는 "결과 없음"으로 보여 준다.
     @Recover
     public KakaoApiResponseDto recoverAddress(RestClientException e, String address) {
         log.error("카카오 주소 검색 실패. address={}", address, e);
+        return null;
+    }
+
+    @Recover
+    public KakaoApiResponseDto recoverKeyword(RestClientException e, String keyword) {
+        log.error("카카오 키워드 검색 실패. keyword={}", keyword, e);
         return null;
     }
 

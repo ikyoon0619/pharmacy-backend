@@ -1,5 +1,6 @@
 package com.example.pharmacy.direction.service;
 
+import com.example.pharmacy.direction.dto.OutputDto;
 import com.example.pharmacy.direction.entity.Direction;
 import com.example.pharmacy.direction.repository.DirectionRepository;
 import com.example.pharmacy.kakao.dto.KakaoApiResponseDto;
@@ -39,18 +40,27 @@ public class DirectionService {
         }
         DocumentDto input = addressResult.documents().get(0);
 
+        return recommendNear(input.addressName(), input.latitude(), input.longitude(),
+                RADIUS_METERS, MAX_SEARCH_COUNT);
+    }
+
+    // 좌표 -> 주변 약국 count 곳 -> DB 저장.
+    // 주소 폼과 AI 자연어 검색이 함께 쓴다. (AI 는 장소 이름으로 좌표를 먼저 구한다)
+    @Transactional
+    public List<Direction> recommendNear(String inputLabel, double latitude, double longitude,
+                                         int radiusMeters, int count) {
         KakaoApiResponseDto pharmacyResult =
-                kakaoSearchService.searchPharmacies(input.latitude(), input.longitude(), RADIUS_METERS);
+                kakaoSearchService.searchPharmacies(latitude, longitude, radiusMeters);
         if (pharmacyResult == null || pharmacyResult.isEmpty()) {
             return Collections.emptyList();
         }
 
         List<Direction> directions = pharmacyResult.documents().stream()
-                .limit(MAX_SEARCH_COUNT)
+                .limit(count)
                 .map(pharmacy -> Direction.builder()
-                        .inputAddress(input.addressName())
-                        .inputLatitude(input.latitude())
-                        .inputLongitude(input.longitude())
+                        .inputAddress(inputLabel)
+                        .inputLatitude(latitude)
+                        .inputLongitude(longitude)
                         .targetPharmacyName(pharmacy.placeName())
                         .targetAddress(pharmacy.addressName())
                         .targetLatitude(pharmacy.latitude())
@@ -75,6 +85,16 @@ public class DirectionService {
                 String.valueOf(direction.getTargetLongitude()));
         return UriComponentsBuilder.fromHttpUrl(KAKAO_MAP_DIRECTION_URL + params)
                 .encode().build().toUriString();
+    }
+
+    // 결과 화면 한 줄 (주소 검색과 AI 검색이 같이 쓴다)
+    public OutputDto toOutput(Direction d) {
+        return new OutputDto(
+                d.getTargetPharmacyName(),
+                d.getTargetAddress(),
+                String.format("%.2f km", d.getDistanceKm()),
+                shortUrlPath(d),
+                roadViewUrl(d));
     }
 
     public String shortUrlPath(Direction direction) {

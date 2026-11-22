@@ -12,6 +12,12 @@ th { background: #f0f3f8; }
 a { color: #2f6fed; }
 .back { display: inline-block; margin-top: 24px; }
 .empty { padding: 16px; background: #fff; border-radius: 8px; }
+.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.card h2 { font-size: 18px; margin: 0 0 12px; }
+.badge { font-size: 12px; background: #eef3ff; color: #2f6fed; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+.search-form .text-input { cursor: text; }
+.hint { color: #666; font-size: 14px; margin: 10px 0 0; }
+.answer { white-space: pre-line; background: #fff; border-left: 4px solid #2f6fed; border-radius: 8px; padding: 16px; margin-bottom: 20px; line-height: 1.6; }
 @media (max-width: 600px) {
     .search-form { flex-direction: column; }
     th:nth-child(2), td:nth-child(2) { display: none; }

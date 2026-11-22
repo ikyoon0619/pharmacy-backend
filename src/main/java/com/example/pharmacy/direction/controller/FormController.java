@@ -28,12 +28,7 @@ public class FormController {
     @PostMapping("/search")
     public String search(@RequestParam("address") String address, Model model) {
         List<OutputDto> outputs = directionService.recommend(address).stream()
-                .map(d -> new OutputDto(
-                        d.getTargetPharmacyName(),
-                        d.getTargetAddress(),
-                        String.format("%.2f km", d.getDistanceKm()),
-                        directionService.shortUrlPath(d),
-                        directionService.roadViewUrl(d)))
+                .map(directionService::toOutput)
                 .toList();
 
         model.addAttribute("address", address);

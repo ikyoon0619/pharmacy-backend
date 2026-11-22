@@ -8,6 +8,16 @@ kakao:
   base-url: https://dapi.kakao.com
   rest-api-key: ${KAKAO_REST_API_KEY}        # 키는 환경변수로만 넣는다 (코드/깃에 넣지 않기)
 
+# Claude (AI 자연어 검색). 키가 없으면 AI 검색만 꺼지고 앱은 정상 실행된다.
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  model: ${ANTHROPIC_MODEL:claude-opus-5-5}
+
+# 공개 데모 비용 보호: 하루 전체 / 하루 IP 당 AI 검색 횟수
+ai:
+  daily-limit: ${AI_DAILY_LIMIT:50}
+  per-client-daily-limit: ${AI_PER_CLIENT_DAILY_LIMIT:5}
+
 server:
   port: ${PORT:8080}                         # Render 가 PORT 환경변수를 넣어 준다
 
