@@ -1,5 +1,6 @@
 package com.example.pharmacy.direction.service;
 
+import com.example.pharmacy.direction.dto.OutputDto;
 import com.example.pharmacy.direction.entity.Direction;
 import com.example.pharmacy.direction.repository.DirectionRepository;
 import com.example.pharmacy.kakao.dto.KakaoApiResponseDto;
@@ -78,5 +79,33 @@ class DirectionServiceTest {
 
         assertThat(url).startsWith("https://map.kakao.com/link/to/")
                 .endsWith(",37.6,127.04");
+    }
+
+    @Test
+    void 전화번호와_장소_링크도_저장하고_빈_전화번호는_숨긴다() {
+        given(kakaoSearchService.searchPharmacies(37.5, 127.0, 3000)).willReturn(new KakaoApiResponseDto(new MetaDto(2), List.of(
+                new DocumentDto("A약국", "주소A", 37.5, 127.0, "180", "02-555-0100", "http://place.map.kakao.com/1"),
+                new DocumentDto("B약국", "주소B", 37.5, 127.0, "1500", "", null))));
+        given(directionRepository.saveAll(anyList())).willAnswer(inv -> inv.getArgument(0));
+
+        List<Direction> result = directionService.recommendNear("강남역", 37.5, 127.0, 3000, 3);
+
+        assertThat(result.get(0).getTargetPhone()).isEqualTo("02-555-0100");
+        assertThat(result.get(0).getTargetPlaceUrl()).isEqualTo("http://place.map.kakao.com/1");
+
+        // 화면용 값으로 바꿀 때 (저장된 뒤라 id 가 있는 상태)
+        OutputDto first = directionService.toOutput(Direction.builder().id(1L)
+                .targetPharmacyName("A약국").distanceKm(0.18).targetPhone("02-555-0100").build());
+        assertThat(first.telLink()).isEqualTo("tel:02-555-0100");
+        assertThat(first.distance()).isEqualTo("180m");
+        OutputDto second = directionService.toOutput(Direction.builder().id(2L)
+                .targetPharmacyName("B약국").distanceKm(1.5).targetPhone("").build());
+        assertThat(second.phone()).isNull(); // 빈 번호면 전화 버튼을 숨긴다
+    }
+
+    @Test
+    void 거리는_1km_미만이면_m_이상이면_km로_보여준다() {
+        assertThat(DirectionService.formatDistance(0.18)).isEqualTo("180m");
+        assertThat(DirectionService.formatDistance(1.234)).isEqualTo("1.2km");
     }
 }

@@ -148,10 +148,12 @@ public class PharmacyTools {
 
         List<Map<String, Object>> pharmacies = new ArrayList<>();
         for (Direction d : directions) {
-            pharmacies.add(Map.of(
-                    "name", d.getTargetPharmacyName(),
-                    "address", d.getTargetAddress(),
-                    "distance_km", d.getDistanceKm()));
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("name", d.getTargetPharmacyName());
+            p.put("address", d.getTargetAddress());
+            p.put("distance_km", d.getDistanceKm());
+            p.put("phone", d.getTargetPhone());
+            pharmacies.add(p);
         }
         return toJson(Map.of(
                 "radius_meters", radius,

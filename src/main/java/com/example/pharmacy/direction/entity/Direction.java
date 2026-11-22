@@ -34,4 +34,7 @@ public class Direction extends BaseTimeEntity {
     private double targetLongitude;
 
     private double distanceKm;
+
+    private String targetPhone;     // 방문 전 전화 확인용
+    private String targetPlaceUrl;  // 카카오맵 장소 상세
 }

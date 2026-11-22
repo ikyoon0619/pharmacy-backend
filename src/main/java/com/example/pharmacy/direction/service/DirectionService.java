@@ -66,6 +66,8 @@ public class DirectionService {
                         .targetLatitude(pharmacy.latitude())
                         .targetLongitude(pharmacy.longitude())
                         .distanceKm(toKm(pharmacy.distance()))
+                        .targetPhone(pharmacy.phone())
+                        .targetPlaceUrl(pharmacy.placeUrl())
                         .build())
                 .toList();
 
@@ -92,9 +94,19 @@ public class DirectionService {
         return new OutputDto(
                 d.getTargetPharmacyName(),
                 d.getTargetAddress(),
-                String.format("%.2f km", d.getDistanceKm()),
+                formatDistance(d.getDistanceKm()),
                 shortUrlPath(d),
-                roadViewUrl(d));
+                roadViewUrl(d),
+                d.getTargetPhone() == null || d.getTargetPhone().isBlank() ? null : d.getTargetPhone(),
+                d.getTargetPlaceUrl());
+    }
+
+    // 1km 미만은 m 로 보여 준다. 예: 0.18 -> "180m", 1.234 -> "1.2km"
+    static String formatDistance(double km) {
+        if (km < 1) {
+            return Math.round(km * 1000) + "m";
+        }
+        return String.format("%.1fkm", km);
     }
 
     public String shortUrlPath(Direction direction) {

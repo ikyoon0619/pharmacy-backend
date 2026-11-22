@@ -1,15 +1,17 @@
 <!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>찾을 수 없음</title>
-    <link rel="stylesheet" href="/css/style.css">
-</head>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('찾을 수 없음 · 약국찾기')}"></head>
 <body>
+<header th:replace="~{fragments :: header}"></header>
+
 <main class="container">
-    <h1>길안내 정보를 찾을 수 없습니다</h1>
-    <p class="desc">데모 서버는 재시작되면 저장된 기록이 지워집니다. 다시 검색해 주세요.</p>
-    <a href="/" class="back">처음으로</a>
+    <div class="empty">
+        <strong>길안내 정보를 찾을 수 없어요</strong>
+        <p>데모 서버는 다시 시작되면 저장된 기록이 지워져요. 처음 화면에서 다시 검색해 주세요.</p>
+    </div>
+    <a href="/" class="btn btn-primary">처음으로</a>
 </main>
+
+<footer th:replace="~{fragments :: footer}"></footer>
 </body>
 </html>

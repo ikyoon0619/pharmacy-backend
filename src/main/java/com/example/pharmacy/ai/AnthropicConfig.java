@@ -16,8 +16,13 @@ public class AnthropicConfig {
 
     @Bean
     @ConditionalOnExpression("!'${anthropic.api-key:}'.isBlank()")
-    public AnthropicClient anthropicClient(@Value("${anthropic.api-key}") String apiKey) {
-        return AnthropicOkHttpClient.builder()
+    public AnthropicClient anthropicClient(@Value("${anthropic.api-key}") String apiKey,
+                                           @Value("${anthropic.base-url:}") String baseUrl) {
+        AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder();
+        if (!baseUrl.isBlank()) {
+            builder.baseUrl(baseUrl); // 로컬에서 가짜 서버로 화면을 확인할 때만 쓴다. 보통은 비워 둔다
+        }
+        return builder
                 .apiKey(apiKey)
                 .timeout(Duration.ofSeconds(30)) // 화면에서 기다리는 요청이라 너무 길게 잡지 않는다
                 .maxRetries(1)
