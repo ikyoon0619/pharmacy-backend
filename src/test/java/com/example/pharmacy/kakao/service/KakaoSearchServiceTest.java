@@ -91,4 +91,19 @@ class KakaoSearchServiceTest {
         assertThat(kakaoSearchService.searchAddress("서울")).isNull();
         server.verify(); // 요청은 딱 1번
     }
+
+    @Test
+    void 키워드_검색은_장소_이름으로_1건만_요청한다() {
+        server.expect(requestTo(startsWith("https://dapi.kakao.com/v2/local/search/keyword.json")))
+                .andExpect(queryParam("size", "1"))
+                .andRespond(withSuccess("""
+                        {"meta":{"total_count":1},
+                         "documents":[{"place_name":"강남역 2호선","address_name":"서울 강남구 역삼동 858","x":"127.027","y":"37.498"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        KakaoApiResponseDto result = kakaoSearchService.searchKeyword("강남역");
+
+        assertThat(result.documents().get(0).placeName()).isEqualTo("강남역 2호선");
+        assertThat(result.documents().get(0).latitude()).isEqualTo(37.498);
+    }
 }
