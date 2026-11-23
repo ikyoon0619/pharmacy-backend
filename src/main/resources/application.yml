@@ -18,6 +18,12 @@ ai:
   daily-limit: ${AI_DAILY_LIMIT:50}
   per-client-daily-limit: ${AI_PER_CLIENT_DAILY_LIMIT:5}
 
+# 공공데이터포털 국립중앙의료원 전국 약국 정보 (영업시간). 키가 없으면 영업시간 기능만 꺼진다.
+opendata:
+  service-key: ${DATA_GO_KR_SERVICE_KEY:}
+  base-url: https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService
+  page-size: 1000
+
 server:
   port: ${PORT:8080}                         # Render 가 PORT 환경변수를 넣어 준다
 

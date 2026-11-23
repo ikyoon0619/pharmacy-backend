@@ -129,6 +129,10 @@ a { color: var(--brand-dark); }
 .pharmacy h3 a { color: var(--text); text-decoration: none; }
 .pharmacy h3 a:hover { text-decoration: underline; }
 .address { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.hours { margin: 6px 0 0; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.open-pill { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.open-pill.is-open { background: var(--brand-soft); color: var(--brand-dark); }
+.open-pill.is-closed { background: #f1f1f1; color: #777; }
 .distance { flex: none; font-weight: 800; color: var(--brand-dark); font-size: 15px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-left: 40px; }
 .phone { font-weight: 400; color: var(--muted); font-size: 14px; }

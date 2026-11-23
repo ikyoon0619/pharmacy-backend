@@ -55,7 +55,15 @@ public class DirectionService {
             return Collections.emptyList();
         }
 
-        List<Direction> directions = pharmacyResult.documents().stream()
+        return saveDirections(inputLabel, latitude, longitude, pharmacyResult.documents(), count);
+    }
+
+    // 약국 목록 -> Direction 저장 (짧은 길안내 URL 을 만들려면 id 가 필요하다).
+    // 카카오 검색 결과와 영업시간 데이터(공공데이터) 검색 결과가 함께 쓴다.
+    @Transactional
+    public List<Direction> saveDirections(String inputLabel, double latitude, double longitude,
+                                          List<DocumentDto> pharmacies, int count) {
+        List<Direction> directions = pharmacies.stream()
                 .limit(count)
                 .map(pharmacy -> Direction.builder()
                         .inputAddress(inputLabel)

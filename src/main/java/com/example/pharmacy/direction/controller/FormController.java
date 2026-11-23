@@ -2,6 +2,7 @@ package com.example.pharmacy.direction.controller;
 
 import com.example.pharmacy.direction.dto.OutputDto;
 import com.example.pharmacy.direction.service.DirectionService;
+import com.example.pharmacy.direction.view.ResultViewAssembler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,6 +18,7 @@ import java.util.List;
 public class FormController {
 
     private final DirectionService directionService;
+    private final ResultViewAssembler resultViewAssembler;
 
     // 첫 화면: 주소 입력 폼
     @GetMapping("/")
@@ -27,9 +29,7 @@ public class FormController {
     // 검색: 추천 결과 화면
     @PostMapping("/search")
     public String search(@RequestParam("address") String address, Model model) {
-        List<OutputDto> outputs = directionService.recommend(address).stream()
-                .map(directionService::toOutput)
-                .toList();
+        List<OutputDto> outputs = resultViewAssembler.toOutputs(directionService.recommend(address));
 
         model.addAttribute("address", address);
         model.addAttribute("outputs", outputs);

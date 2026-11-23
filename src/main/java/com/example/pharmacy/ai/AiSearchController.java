@@ -1,7 +1,7 @@
 package com.example.pharmacy.ai;
 
 import com.example.pharmacy.direction.dto.OutputDto;
-import com.example.pharmacy.direction.service.DirectionService;
+import com.example.pharmacy.direction.view.ResultViewAssembler;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -18,7 +18,7 @@ public class AiSearchController {
 
     private final AiSearchService aiSearchService;
     private final AiUsageLimiter usageLimiter;
-    private final DirectionService directionService;
+    private final ResultViewAssembler resultViewAssembler;
 
     // 문장으로 찾기: "강남역 근처 약국 찾아줘"
     @PostMapping("/ai-search")
@@ -42,7 +42,7 @@ public class AiSearchController {
         }
 
         AiSearchResult result = aiSearchService.search(q);
-        List<OutputDto> outputs = result.directions().stream().map(directionService::toOutput).toList();
+        List<OutputDto> outputs = resultViewAssembler.toOutputs(result.directions());
         model.addAttribute("answer", result.answer());
         model.addAttribute("outputs", outputs);
         return "ai-output";

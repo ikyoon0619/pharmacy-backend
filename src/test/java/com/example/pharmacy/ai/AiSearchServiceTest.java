@@ -7,6 +7,7 @@ import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.services.blocking.MessageService;
 import com.example.pharmacy.direction.entity.Direction;
+import com.example.pharmacy.hours.PharmacyHoursService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -35,12 +38,17 @@ class AiSearchServiceTest {
     private MessageService messages;
     @Mock
     private PharmacyTools tools;
+    @Mock
+    private PharmacyHoursService hoursService;
 
     private AiSearchService service;
 
     @BeforeEach
     void setUp() {
-        service = new AiSearchService(Optional.of(client), tools, "claude-opus-5-5");
+        // 2026-11-23 월요일 10:22 (한국)
+        lenient().when(hoursService.now()).thenReturn(
+                new PharmacyHoursService.Now(1, 1022, LocalDateTime.of(2026, 11, 23, 10, 22)));
+        service = new AiSearchService(Optional.of(client), tools, hoursService, "claude-opus-5-5");
     }
 
     // Claude API 응답 모양 그대로 Message 를 만든다
@@ -148,9 +156,45 @@ class AiSearchServiceTest {
 
     @Test
     void 키가_없으면_꺼진_상태() {
-        AiSearchService disabled = new AiSearchService(Optional.empty(), tools, "claude-opus-5-5");
+        AiSearchService disabled = new AiSearchService(Optional.empty(), tools, hoursService, "claude-opus-5-5");
 
         assertThat(disabled.isEnabled()).isFalse();
         assertThat(disabled.search("강남역").answer()).contains("꺼져 있어요");
+    }
+
+    @Test
+    void 현재_한국_시각을_질문_앞에_붙이고_영업시간_도구는_데이터가_있을_때만_준다() throws Exception {
+        given(client.messages()).willReturn(messages);
+        given(messages.create(any(MessageCreateParams.class))).willReturn(message("end_turn", """
+                [{"type":"text","text":"ok"}]"""));
+        given(tools.definitions()).willReturn(List.of());
+        given(tools.openHoursDefinition()).willReturn(com.anthropic.models.messages.Tool.builder()
+                .name("search_open_pharmacies")
+                .inputSchema(com.anthropic.models.messages.Tool.InputSchema.builder().build()).build());
+        given(hoursService.isAvailable()).willReturn(true);
+
+        service.search("지금 문 연 약국");
+
+        ArgumentCaptor<MessageCreateParams> captor = ArgumentCaptor.forClass(MessageCreateParams.class);
+        verify(messages).create(captor.capture());
+        MessageCreateParams sent = captor.getValue();
+        assertThat(sent.messages().get(0).toString()).contains("2026-11-23 월요일(요일 번호 1) 10:22");
+        assertThat(sent.tools().orElseThrow().toString()).contains("search_open_pharmacies");
+        assertThat(sent.system().orElseThrow().toString()).contains("search_open_pharmacies 를 쓴다");
+    }
+
+    @Test
+    void 영업시간_데이터가_없으면_모른다고_하라는_규칙을_쓴다() throws Exception {
+        given(client.messages()).willReturn(messages);
+        given(messages.create(any(MessageCreateParams.class))).willReturn(message("end_turn", """
+                [{"type":"text","text":"ok"}]"""));
+        given(hoursService.isAvailable()).willReturn(false);
+
+        service.search("지금 문 연 약국");
+
+        ArgumentCaptor<MessageCreateParams> captor = ArgumentCaptor.forClass(MessageCreateParams.class);
+        verify(messages).create(captor.capture());
+        assertThat(captor.getValue().system().orElseThrow().toString()).contains("영업시간 데이터가 없다");
+        verify(tools, never()).openHoursDefinition();
     }
 }

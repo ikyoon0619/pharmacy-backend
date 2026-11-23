@@ -1,6 +1,7 @@
 package com.example.pharmacy.direction.controller;
 
 import com.example.pharmacy.direction.service.DirectionService;
+import com.example.pharmacy.direction.view.ResultViewAssembler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -25,6 +26,8 @@ class FormControllerTest {
 
     @MockBean
     private DirectionService directionService;
+    @MockBean
+    private ResultViewAssembler resultViewAssembler;
 
     @Test
     void 첫_화면은_main_뷰() throws Exception {

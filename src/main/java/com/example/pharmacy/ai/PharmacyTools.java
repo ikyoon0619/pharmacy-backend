@@ -4,6 +4,9 @@ import com.anthropic.core.JsonValue;
 import com.anthropic.models.messages.Tool;
 import com.example.pharmacy.direction.entity.Direction;
 import com.example.pharmacy.direction.service.DirectionService;
+import com.example.pharmacy.hours.PharmacyHours;
+import com.example.pharmacy.hours.PharmacyHoursService;
+import com.example.pharmacy.hours.WeeklyHours;
 import com.example.pharmacy.kakao.dto.KakaoApiResponseDto;
 import com.example.pharmacy.kakao.dto.KakaoApiResponseDto.DocumentDto;
 import com.example.pharmacy.kakao.service.KakaoSearchService;
@@ -26,6 +29,7 @@ public class PharmacyTools {
 
     static final String FIND_LOCATION = "find_location";
     static final String SEARCH_PHARMACIES = "search_pharmacies";
+    static final String SEARCH_OPEN_PHARMACIES = "search_open_pharmacies";
 
     static final int DEFAULT_RADIUS = 3_000;
     static final int MIN_RADIUS = 300;
@@ -35,6 +39,7 @@ public class PharmacyTools {
 
     private final KakaoSearchService kakaoSearchService;
     private final DirectionService directionService;
+    private final PharmacyHoursService hoursService;
     private final ObjectMapper objectMapper;
 
     // 한 번의 검색(질문 1개) 동안 도구 결과를 모아 두는 곳
@@ -88,6 +93,31 @@ public class PharmacyTools {
         return List.of(findLocation, searchPharmacies);
     }
 
+    // 영업시간 데이터가 있을 때만 주는 세 번째 도구
+    public Tool openHoursDefinition() {
+        return Tool.builder()
+                .name(SEARCH_OPEN_PHARMACIES)
+                .description("좌표 주변에서 특정 요일, 특정 시각에 문을 연 약국을 가까운 순서로 찾는다. "
+                        + "국립중앙의료원 공공데이터의 영업시간 기준이다. "
+                        + "day 는 1=월 2=화 3=수 4=목 5=금 6=토 7=일 8=공휴일. "
+                        + "time 은 24시간제 HHMM 문자열 (예: 오후 11시 -> \"2300\", 새벽 1시 반 -> \"0130\"). "
+                        + "radius_meters 는 300~20000 (기본 3000), count 는 1~5 (기본 3).")
+                .inputSchema(Tool.InputSchema.builder()
+                        .properties(Tool.InputSchema.Properties.builder()
+                                .putAdditionalProperty("latitude", JsonValue.from(Map.of("type", "number")))
+                                .putAdditionalProperty("longitude", JsonValue.from(Map.of("type", "number")))
+                                .putAdditionalProperty("radius_meters", JsonValue.from(Map.of("type", "integer")))
+                                .putAdditionalProperty("day", JsonValue.from(Map.of("type", "integer")))
+                                .putAdditionalProperty("time", JsonValue.from(Map.of("type", "string")))
+                                .putAdditionalProperty("count", JsonValue.from(Map.of("type", "integer")))
+                                .build())
+                        .required(List.of("latitude", "longitude", "radius_meters", "day", "time", "count"))
+                        .putAdditionalProperty("additionalProperties", JsonValue.from(false))
+                        .build())
+                .strict(true)
+                .build();
+    }
+
     // ---------- 도구 실행 ----------
 
     record FindLocationInput(String query) {
@@ -100,11 +130,21 @@ public class PharmacyTools {
             Integer count) {
     }
 
+    record SearchOpenInput(
+            double latitude,
+            double longitude,
+            @JsonProperty("radius_meters") Integer radiusMeters,
+            Integer day,
+            String time,
+            Integer count) {
+    }
+
     // Claude 가 고른 도구를 실행하고, 결과를 JSON 문자열로 돌려준다 (tool_result 로 다시 Claude 에게 간다)
     public String execute(String toolName, JsonValue input, Session session) {
         return switch (toolName) {
             case FIND_LOCATION -> findLocation(parse(input, FindLocationInput.class), session);
             case SEARCH_PHARMACIES -> searchPharmacies(parse(input, SearchPharmaciesInput.class), session);
+            case SEARCH_OPEN_PHARMACIES -> searchOpen(parse(input, SearchOpenInput.class), session);
             default -> throw new IllegalArgumentException("모르는 도구: " + toolName);
         };
     }
@@ -153,12 +193,56 @@ public class PharmacyTools {
             p.put("address", d.getTargetAddress());
             p.put("distance_km", d.getDistanceKm());
             p.put("phone", d.getTargetPhone());
+            hoursService.match(d.getTargetPharmacyName(), d.getTargetPhone(), d.getTargetLatitude(), d.getTargetLongitude())
+                    .map(PharmacyHours::hours)
+                    .filter(h -> !h.isEmpty())
+                    .ifPresent(h -> p.put("hours_today", h.label(hoursService.now().day())));
             pharmacies.add(p);
         }
         return toJson(Map.of(
                 "radius_meters", radius,
                 "count", pharmacies.size(),
                 "pharmacies", pharmacies));
+    }
+
+    // 영업시간 데이터에서 "그때 연 약국" 을 찾고, 길안내 링크를 위해 Direction 으로 저장한다
+    private String searchOpen(SearchOpenInput in, Session session) {
+        int radius = clamp(in.radiusMeters(), DEFAULT_RADIUS, MIN_RADIUS, MAX_RADIUS);
+        int count = clamp(in.count(), DEFAULT_COUNT, 1, MAX_COUNT);
+        int day = clamp(in.day(), hoursService.now().day(), 1, WeeklyHours.HOLIDAY);
+        Integer hhmm = WeeklyHours.parseTime(in.time());
+        if (hhmm == null) {
+            throw new IllegalArgumentException("time 은 HHMM 형식이어야 합니다: " + in.time());
+        }
+        String label = session.lastLocationName != null ? session.lastLocationName : "AI 검색 위치";
+
+        List<PharmacyHoursService.Nearby> open = hoursService.findOpenNear(
+                in.latitude(), in.longitude(), radius, day, hhmm, count);
+        List<DocumentDto> docs = open.stream()
+                .map(n -> new DocumentDto(n.pharmacy().getName(), n.pharmacy().getAddress(),
+                        n.pharmacy().getLatitude(), n.pharmacy().getLongitude(),
+                        String.valueOf(Math.round(n.distanceMeters())), n.pharmacy().getTel(), null))
+                .toList();
+        session.directions = directionService.saveDirections(label, in.latitude(), in.longitude(), docs, count);
+
+        List<Map<String, Object>> pharmacies = new ArrayList<>();
+        for (PharmacyHoursService.Nearby n : open) {
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("name", n.pharmacy().getName());
+            p.put("address", n.pharmacy().getAddress());
+            p.put("distance_km", Math.round(n.distanceMeters() / 10.0) / 100.0);
+            p.put("phone", n.pharmacy().getTel());
+            p.put("hours_that_day", n.pharmacy().hours().label(day));
+            pharmacies.add(p);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("day", WeeklyHours.dayName(day));
+        result.put("time", in.time());
+        result.put("radius_meters", radius);
+        result.put("count", pharmacies.size());
+        result.put("pharmacies", pharmacies);
+        result.put("source", "국립중앙의료원 공공데이터 (실제 영업시간과 다를 수 있음)");
+        return toJson(result);
     }
 
     private static DocumentDto first(KakaoApiResponseDto response) {
