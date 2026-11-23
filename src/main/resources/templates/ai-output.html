@@ -6,7 +6,7 @@
 
 <main class="container">
     <!-- 결과 화면에서도 바로 다시 물어볼 수 있게 검색칸을 위에 둔다 -->
-    <form action="/ai-search" method="post" class="search-box compact" data-loading="찾는 중…" data-status="ai-status">
+    <form action="/ai-search" method="post" class="search-box compact" data-loading="찾는 중…" data-status="ai-status" data-stream>
         <label for="query" class="sr-only">다시 묻기</label>
         <input type="text" id="query" name="query" required maxlength="200" autocomplete="off" th:value="${query}">
         <button type="submit" class="btn btn-primary btn-search" data-label="다시 찾기"><span class="label">다시 찾기</span></button>
@@ -15,21 +15,35 @@
         <span class="spinner" aria-hidden="true"></span> AI가 다시 찾고 있어요.
     </p>
 
-    <!-- th:text 는 HTML 을 이스케이프한다. AI 답변을 그대로 넣어도 스크립트가 실행되지 않는다 -->
-    <section class="answer" aria-label="AI 안내">
-        <span class="answer-badge">AI</span>
-        <p th:text="${answer}">AI 안내 문장</p>
-    </section>
+    <!-- 실시간 화면 (/ai?q=...): JS 가 /ai-search/stream 을 열어 아래 칸을 채운다 -->
+    <th:block th:if="${streaming}">
+        <div id="ai-live" th:data-query="${query}">
+            <ol class="ai-steps" id="ai-steps" aria-live="polite" aria-label="진행 단계"></ol>
+            <section class="answer is-streaming" aria-label="AI 안내">
+                <span class="answer-badge">AI</span>
+                <p id="ai-answer"></p>
+            </section>
+            <div id="ai-results"></div>
+        </div>
+        <noscript><p class="status">이 화면은 JavaScript 가 필요해요. <a href="/">처음으로</a> 돌아가 다시 검색해 주세요.</p></noscript>
+    </th:block>
 
-    <section th:unless="${#lists.isEmpty(outputs)}">
-        <h2 class="section-title">가까운 약국 <span th:text="${#lists.size(outputs)}">3</span>곳</h2>
-        <ol th:replace="~{fragments :: pharmacy-list}"></ol>
-    </section>
+    <!-- 일반 화면 (POST /ai-search): 결과를 한 번에 그린다 -->
+    <th:block th:unless="${streaming}">
+        <!-- th:text 는 HTML 을 이스케이프한다. AI 답변을 그대로 넣어도 스크립트가 실행되지 않는다 -->
+        <section class="answer" aria-label="AI 안내">
+            <span class="answer-badge">AI</span>
+            <p th:text="${answer}">AI 안내 문장</p>
+        </section>
+
+        <section th:replace="~{fragments :: pharmacy-section}"></section>
+    </th:block>
 
     <a href="/" class="back">← 처음으로</a>
 </main>
 
 <footer th:replace="~{fragments :: footer}"></footer>
 <script th:replace="~{fragments :: loading-script}"></script>
+<script th:if="${streaming}" th:src="@{/js/ai-stream.js}"></script>
 </body>
 </html>

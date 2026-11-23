@@ -150,3 +150,34 @@ a { color: var(--brand-dark); }
     .actions .btn { flex: 1; }
     .phone { display: none; }  /* 좁은 화면에서는 "전화" 버튼만 */
 }
+
+/* ---- 실시간 AI 화면 (/ai?q=...) ---- */
+.ai-steps { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 6px; }
+.ai-step {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--muted); font-size: 14px;
+    animation: step-in .2s ease-out;
+}
+.ai-step::before {
+    content: ""; flex: none; width: 16px; height: 16px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 11px; font-weight: 800; line-height: 1;
+}
+.ai-step.is-active { color: var(--text); font-weight: 600; }
+.ai-step.is-active::before {
+    border: 2px solid var(--brand-soft); border-top-color: var(--brand); animation: spin .8s linear infinite;
+}
+.ai-step.is-done::before { content: "✓"; background: var(--brand-soft); color: var(--brand-dark); }
+@keyframes step-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+
+/* 답변이 오는 중: 글자 뒤에 깜빡이는 커서 */
+.answer.is-streaming p:empty::before { content: "생각하는 중…"; color: var(--muted); }
+.answer.is-streaming p::after {
+    content: ""; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px;
+    background: var(--brand); animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink { to { visibility: hidden; } }
+#ai-results:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-step, .ai-step.is-active::before, .answer.is-streaming p::after { animation: none; }
+}

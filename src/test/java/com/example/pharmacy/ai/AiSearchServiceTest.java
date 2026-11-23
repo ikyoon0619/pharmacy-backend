@@ -2,9 +2,11 @@ package com.example.pharmacy.ai;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.core.ObjectMappers;
+import com.anthropic.core.http.StreamResponse;
 import com.anthropic.errors.AnthropicIoException;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.services.blocking.MessageService;
 import com.example.pharmacy.direction.entity.Direction;
 import com.example.pharmacy.hours.PharmacyHoursService;
@@ -16,7 +18,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -196,5 +200,84 @@ class AiSearchServiceTest {
         verify(messages).create(captor.capture());
         assertThat(captor.getValue().system().orElseThrow().toString()).contains("영업시간 데이터가 없다");
         verify(tools, never()).openHoursDefinition();
+    }
+
+    // 스트리밍 응답: Claude API 가 실제로 보내는 이벤트 순서 그대로 만든다
+    private static StreamResponse<RawMessageStreamEvent> streamOf(String... eventJsons) throws Exception {
+        List<RawMessageStreamEvent> events = new ArrayList<>();
+        for (String json : eventJsons) {
+            events.add(ObjectMappers.jsonMapper().readValue(json, RawMessageStreamEvent.class));
+        }
+        return new StreamResponse<>() {
+            @Override
+            public Stream<RawMessageStreamEvent> stream() {
+                return events.stream();
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+    }
+
+    private static final String START = """
+            {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"claude-opus-5-5",
+             "content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":1}}}""";
+
+    private static String stop(String reason) {
+        return """
+                {"type":"message_delta","delta":{"stop_reason":"%s","stop_sequence":null},"usage":{"output_tokens":5}}""".formatted(reason);
+    }
+
+    @Test
+    void 스트리밍이면_진행_단계와_답변_조각을_바로_넘기고_결과는_같다() throws Exception {
+        StreamResponse<RawMessageStreamEvent> toolTurn = streamOf(START,
+                """
+                {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_1","name":"find_location","input":{}}}""",
+                """
+                {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"query\\":"}}""",
+                """
+                {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\"강남역\\"}"}}""",
+                """
+                {"type":"content_block_stop","index":0}""",
+                stop("tool_use"),
+                """
+                {"type":"message_stop"}""");
+        StreamResponse<RawMessageStreamEvent> textTurn = streamOf(START,
+                """
+                {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""",
+                """
+                {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"강남역 근처"}}""",
+                """
+                {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" 약국이에요."}}""",
+                """
+                {"type":"content_block_stop","index":0}""",
+                stop("end_turn"),
+                """
+                {"type":"message_stop"}""");
+
+        given(client.messages()).willReturn(messages);
+        given(messages.createStreaming(any(MessageCreateParams.class))).willReturn(toolTurn, textTurn);
+        given(tools.execute(eq("find_location"), any(), any())).willReturn("{\"found\":true}");
+
+        List<String> steps = new ArrayList<>();
+        StringBuilder text = new StringBuilder();
+        AiSearchResult result = service.search("강남역 약국", new AiSearchListener() {
+            @Override
+            public void onStep(String label) {
+                steps.add(label);
+            }
+
+            @Override
+            public void onText(String delta) {
+                text.append(delta);
+            }
+        });
+
+        // 조각으로 받은 도구 입력도 제대로 합쳐져서 단계 문장에 쓰였다
+        assertThat(steps).containsExactly("'강남역' 위치를 찾고 있어요");
+        assertThat(text.toString()).isEqualTo("강남역 근처 약국이에요.");
+        assertThat(result.answer()).isEqualTo("강남역 근처 약국이에요.");
+        verify(messages, never()).create(any(MessageCreateParams.class));
     }
 }

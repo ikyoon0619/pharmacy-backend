@@ -142,4 +142,22 @@ class PharmacyToolsTest {
                 "day", 1, "time", "밤", "count", 3)), new PharmacyTools.Session()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void 도구_호출을_화면에_보여_줄_진행_단계_문장으로_바꾼다() {
+        assertThat(PharmacyTools.describe("find_location", JsonValue.from(Map.of("query", "강남역"))))
+                .isEqualTo("'강남역' 위치를 찾고 있어요");
+        assertThat(PharmacyTools.describe("search_pharmacies", JsonValue.from(Map.of("radius_meters", 1500))))
+                .isEqualTo("반경 1.5km 안에서 약국을 찾고 있어요");
+        assertThat(PharmacyTools.describe("search_pharmacies", JsonValue.from(Map.of("radius_meters", 100))))
+                .isEqualTo("반경 300m 안에서 약국을 찾고 있어요");
+        assertThat(PharmacyTools.describe("search_open_pharmacies", JsonValue.from(Map.of("day", 7, "time", "22:00"))))
+                .isEqualTo("일요일 22:00에 여는 약국을 찾고 있어요");
+        assertThat(PharmacyTools.describe("search_open_pharmacies", JsonValue.from(Map.of())))
+                .isEqualTo("지금 여는 약국을 찾고 있어요");
+        assertThat(PharmacyTools.describe("search_open_pharmacies", JsonValue.from(Map.of("day", 8))))
+                .isEqualTo("공휴일에 여는 약국을 찾고 있어요");
+        assertThat(PharmacyTools.describe("unknown", JsonValue.from(Map.of())))
+                .isEqualTo("정보를 찾고 있어요");
+    }
 }
