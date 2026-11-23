@@ -51,6 +51,12 @@
     </li>
 </ol>
 
+<!-- 제목 + 카드 목록. SSE 화면은 서버가 이 조각만 HTML 로 그려서 보낸다 (AiSearchStreamer.renderCards) -->
+<section th:fragment="pharmacy-section" th:unless="${#lists.isEmpty(outputs)}" class="results">
+    <h2 class="section-title">가까운 약국 <span th:text="${#lists.size(outputs)}">3</span>곳</h2>
+    <ol th:replace="~{fragments :: pharmacy-list}"></ol>
+</section>
+
 <footer th:fragment="footer" class="site-footer">
     <p>약국 정보는 카카오 지도 검색 결과예요. 영업시간은 국립중앙의료원 공공데이터 기준이라 실제와 다를 수 있으니 방문 전에 전화로 확인해 주세요.</p>
     <p>
@@ -61,8 +67,19 @@
 
 <!-- 폼을 보내면 버튼을 잠그고 "찾는 중" 표시. 두 번 눌러 요청이 두 번 가는 것도 막는다 -->
 <script th:fragment="loading-script">
+    // AI 폼(data-stream): 브라우저가 스트림 읽기를 지원하면 /ai?q=... 화면으로 이동해서 결과를 실시간으로 받는다.
+    // 지원하지 않으면 원래대로 POST /ai-search 로 보내서 한 번에 받는다.
+    var canStream = !!(window.fetch && window.ReadableStream && window.TextDecoder);
     document.querySelectorAll("form[data-loading]").forEach(function (form) {
-        form.addEventListener("submit", function () {
+        form.addEventListener("submit", function (e) {
+            if (canStream && form.hasAttribute("data-stream")) {
+                var q = form.querySelector("[name=query]").value.trim();
+                if (q) {
+                    e.preventDefault();
+                    location.href = "/ai?q=" + encodeURIComponent(q);
+                    return;
+                }
+            }
             var button = form.querySelector("button[type=submit]");
             if (button) {
                 button.disabled = true;

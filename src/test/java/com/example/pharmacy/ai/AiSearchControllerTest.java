@@ -9,6 +9,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
@@ -17,9 +19,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -35,6 +40,8 @@ class AiSearchControllerTest {
     private AiUsageLimiter usageLimiter;
     @MockBean
     private ResultViewAssembler resultViewAssembler;
+    @MockBean
+    private AiSearchStreamer streamer;
 
     @Test
     void AI_답변과_약국_표를_보여_준다() throws Exception {
@@ -88,5 +95,46 @@ class AiSearchControllerTest {
 
         mockMvc.perform(post("/ai-search").param("query", "강남역"))
                 .andExpect(content().string(containsString("&lt;script&gt;")));
+    }
+
+    @Test
+    void 실시간_화면은_질문을_담아_보내고_스트림_스크립트를_넣는다() throws Exception {
+        mockMvc.perform(get("/ai").param("q", " 강남역 <약국> "))
+                .andExpect(status().isOk())
+                .andExpect(view().name("ai-output"))
+                .andExpect(content().string(containsString("data-query=\"강남역 &lt;약국&gt;\"")))
+                .andExpect(content().string(containsString("/js/ai-stream.js")));
+        verify(aiSearchService, never()).search(anyString());
+    }
+
+    @Test
+    void 질문_없이_실시간_화면에_오면_처음으로() throws Exception {
+        mockMvc.perform(get("/ai"))
+                .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    void 스트림은_한도를_먼저_확인하고_통과하면_시작한다() throws Exception {
+        given(aiSearchService.isEnabled()).willReturn(true);
+        given(usageLimiter.tryAcquire(anyString())).willReturn(true);
+        given(streamer.start("강남역 약국")).willReturn(new SseEmitter());
+
+        mockMvc.perform(post("/ai-search/stream").param("query", " 강남역 약국 "))
+                .andExpect(header().string("X-Accel-Buffering", "no"));
+
+        verify(streamer).start("강남역 약국");
+        verify(streamer, never()).finished(anyString());
+    }
+
+    @Test
+    void 스트림도_한도를_넘으면_안내만_보내고_검색하지_않는다() throws Exception {
+        given(aiSearchService.isEnabled()).willReturn(true);
+        given(usageLimiter.tryAcquire(anyString())).willReturn(false);
+        given(streamer.finished(anyString())).willReturn(new SseEmitter());
+
+        mockMvc.perform(post("/ai-search/stream").param("query", "강남역 약국"));
+
+        verify(streamer).finished(org.mockito.ArgumentMatchers.contains("한도를 다 썼어요"));
+        verify(streamer, never()).start(anyString());
     }
 }

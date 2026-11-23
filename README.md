@@ -14,7 +14,7 @@
 | <img src="docs/screenshot-main.png" width="480"> | <img src="docs/screenshot-ai-mobile.png" width="220"> |
 
 - 탭으로 "AI에게 묻기"와 "주소로 찾기"를 나누고, 예시 질문 칩을 누르면 입력칸이 채워집니다.
-- AI 검색은 몇 초 걸리므로 버튼을 잠그고 "찾는 중" 상태를 보여 줍니다 (두 번 요청 방지).
+- AI 검색은 **SSE(Server-Sent Events)로 실시간**으로 보여 줍니다. "'강남역' 위치를 찾고 있어요 → 일요일 22:00에 여는 약국을 찾고 있어요" 같은 진행 단계가 차례로 뜨고, Claude 답변은 한 글자씩 나옵니다. 버튼은 잠가서 두 번 요청을 막습니다.
 - 결과는 카드로 보여 주고, 약국마다 길안내 / 전화 / 로드뷰 버튼을 둡니다. 전화번호는 카카오 검색 결과의 `phone` 값을 씁니다.
 - 영업시간 데이터가 있는 약국은 카드에 "영업 중 / 영업 종료"와 오늘 영업시간을 보여 줍니다.
 
@@ -27,6 +27,12 @@
                                     │   ──tool_use──► search_pharmacies (카카오 약국 검색 + 저장)
                                     │   ──tool_use──► search_open_pharmacies (요일·시각에 여는 약국, DB 조회)
                                     └──► 짧은 안내 문장 + 약국 표 (표는 도구 결과로만 그림)
+
+실시간 (JS 가 있을 때):
+/ai?q=… 화면 ──fetch POST /ai-search/stream──► SseEmitter (요청 스레드는 바로 반환)
+   ◄── event:step  {"text":"'강남역' 위치를 찾고 있어요"}      ← 도구 부르기 직전
+   ◄── event:token {"text":"강남역 근처"} …                   ← Claude 스트리밍 응답 조각
+   ◄── event:done  {"answer":"…","html":"<section>약국 카드</section>"}
 ```
 
 ## 기술 스택
@@ -38,7 +44,7 @@
 | DB | H2 (데모), MariaDB (로컬, Docker Compose) |
 | 외부 API | 카카오 로컬 API (주소 검색, 키워드 검색, 카테고리 검색 `PM9`), 공공데이터포털 국립중앙의료원 전국 약국 정보 |
 | LLM | Claude (Anthropic Java SDK, Tool Use) |
-| Test | JUnit 5, Mockito, MockRestServiceServer, `@WebMvcTest` (64개) |
+| Test | JUnit 5, Mockito, MockRestServiceServer, `@WebMvcTest` (74개) |
 | 배포 | Docker (멀티 스테이지), Render |
 
 ## 구조
@@ -46,7 +52,7 @@
 ```
 src/main/java/com/example/pharmacy
 ├── config/      RestClient(카카오 인증 헤더), JPA Auditing
-├── ai/         Claude Tool Use 루프, 도구 3개, 하루 사용량 제한
+├── ai/         Claude Tool Use 루프, 도구 3개, 하루 사용량 제한, SSE 스트리밍
 ├── hours/       약국 영업시간 (공공데이터 수집, 매일 새벽 4시 갱신, 시간 조건 검색)
 ├── kakao/       카카오 API 호출 (재시도 + 실패 시 Recover)
 ├── direction/   추천 로직, Base62 짧은 URL, 컨트롤러
@@ -63,6 +69,7 @@ src/main/java/com/example/pharmacy
 - **영업시간은 벡터 검색이 아니라 표 데이터로 찾습니다.** 영업시간은 "요일·시작·끝"이 정해진 숫자라서, 문서를 쪼개 임베딩하는 대신 DB에 저장하고 위경도 범위 + 시간 비교로 정확히 거릅니다. LLM 은 "일요일 밤 10시"를 `day=7, time=22:00` 으로 바꾸는 일만 합니다. 자정을 넘기는 영업(19:00~다음날 02:00)과 전날 밤에서 이어지는 시간도 계산합니다.
 - **"지금"은 서버 시계로 정합니다.** 질문 앞에 `[현재 한국 시각: …]` 을 붙여 보내서, 모델이 오늘 요일을 추측하지 않게 했습니다.
 - **공공데이터 수집 실패가 서비스를 멈추지 않습니다.** 앱이 뜬 뒤 백그라운드에서 받아 오고, 키가 없거나 실패하면 영업시간 기능만 꺼집니다.
+- **기다리는 시간을 보이게 했습니다 (SSE).** 에이전트 루프는 별도 스레드풀에서 돌고, 도구를 부를 때마다 진행 단계를, Claude 응답은 스트리밍 조각을 바로 보냅니다. 브라우저 `EventSource` 는 GET 만 되므로 `fetch` 로 스트림을 직접 읽습니다. 사용자가 페이지를 떠나면 전송이 실패하는 순간 루프를 멈춰 Claude 호출을 더 쓰지 않습니다. JS 가 없으면 기존 POST 화면으로 동작합니다.
 - **공개 데모 비용을 막습니다.** AI 검색은 하루 전체 50번, IP 당 5번까지 (환경변수로 조절). `ANTHROPIC_API_KEY` 가 없으면 AI 검색만 꺼지고 주소 검색은 그대로 동작합니다.
 - **프로필로 환경을 나눕니다.** `demo`(H2, 기본값)와 `local`(MariaDB)이 있습니다. 키와 비밀번호는 환경변수로만 받습니다.
 

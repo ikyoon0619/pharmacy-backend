@@ -149,6 +149,44 @@ public class PharmacyTools {
         };
     }
 
+    // 화면에 보여 줄 진행 단계 문장. 예: "'강남역' 위치를 찾고 있어요"
+    // AI 가 준 값을 그대로 쓰지만, 화면에서는 textContent 로 넣어서 HTML 로 해석되지 않는다.
+    static String describe(String toolName, JsonValue input) {
+        Map<?, ?> in;
+        try {
+            in = input.convert(Map.class);
+        } catch (RuntimeException e) {
+            in = Map.of();
+        }
+        if (in == null) {
+            in = Map.of();
+        }
+        return switch (toolName) {
+            case FIND_LOCATION -> in.get("query") != null
+                    ? "'" + in.get("query") + "' 위치를 찾고 있어요"
+                    : "위치를 찾고 있어요";
+            case SEARCH_PHARMACIES -> "반경 " + radiusLabel(in.get("radius_meters")) + " 안에서 약국을 찾고 있어요";
+            case SEARCH_OPEN_PHARMACIES -> {
+                Object day = in.get("day");
+                Object time = in.get("time");
+                String dayLabel = (day instanceof Number n && n.intValue() >= 1 && n.intValue() <= 8)
+                        ? WeeklyHours.dayName(n.intValue()) + (n.intValue() == 8 ? "" : "요일")
+                        : null;
+                if (dayLabel == null && time == null) {
+                    yield "지금 여는 약국을 찾고 있어요";
+                }
+                String when = (dayLabel == null ? "오늘" : dayLabel) + (time == null ? "" : " " + time);
+                yield when + "에 여는 약국을 찾고 있어요";
+            }
+            default -> "정보를 찾고 있어요";
+        };
+    }
+
+    private static String radiusLabel(Object radius) {
+        int meters = clamp(radius instanceof Number n ? n.intValue() : null, DEFAULT_RADIUS, MIN_RADIUS, MAX_RADIUS);
+        return meters >= 1000 ? (meters % 1000 == 0 ? meters / 1000 + "km" : String.format("%.1fkm", meters / 1000.0)) : meters + "m";
+    }
+
     // SDK 의 JsonValue -> Map -> 우리 record. 문자열을 직접 자르지 않고 JSON 으로 파싱한다.
     private <T> T parse(JsonValue input, Class<T> type) {
         return objectMapper.convertValue(input.convert(Map.class), type);

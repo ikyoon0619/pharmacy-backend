@@ -1,12 +1,15 @@
 package com.example.pharmacy.ai;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.http.StreamResponse;
+import com.anthropic.helpers.MessageAccumulator;
 import com.anthropic.errors.AnthropicException;
 import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.ContentBlockParam;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.OutputConfig;
+import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.ToolResultBlockParam;
 import com.anthropic.models.messages.ToolUseBlock;
@@ -88,6 +91,11 @@ public class AiSearchService {
     }
 
     public AiSearchResult search(String query) {
+        return search(query, AiSearchListener.NONE);
+    }
+
+    // listener 가 있으면 Claude 응답을 스트리밍으로 받아서 글자 조각과 진행 단계를 바로 넘긴다
+    public AiSearchResult search(String query, AiSearchListener listener) {
         if (!isEnabled()) {
             return AiSearchResult.message("AI 검색이 지금은 꺼져 있어요. 아래 주소 검색을 이용해 주세요.");
         }
@@ -113,12 +121,12 @@ public class AiSearchService {
         PharmacyTools.Session session = new PharmacyTools.Session();
         try {
             for (int turn = 0; turn < MAX_TURNS; turn++) {
-                Message response = client.get().messages().create(request.build());
+                Message response = call(request.build(), listener);
                 request.addMessage(response); // 다음 요청에 Claude 의 답(도구 호출 포함)을 그대로 이어 붙인다
 
                 StopReason stop = response.stopReason().orElse(StopReason.END_TURN);
                 if (StopReason.TOOL_USE.equals(stop)) {
-                    request.addUserMessageOfContentBlockParams(runTools(response, session));
+                    request.addUserMessageOfContentBlockParams(runTools(response, session, listener));
                     continue;
                 }
                 if (StopReason.REFUSAL.equals(stop)) {
@@ -136,8 +144,26 @@ public class AiSearchService {
         }
     }
 
+    // 스트리밍이 필요 없으면 한 번에 받고, 필요하면 조각(event)으로 받으면서 글자를 바로 넘긴다.
+    // MessageAccumulator 가 조각을 모아 create() 와 똑같은 Message 를 만들어 주므로 루프의 나머지 코드는 그대로 쓴다.
+    private Message call(MessageCreateParams params, AiSearchListener listener) {
+        if (listener == AiSearchListener.NONE) {
+            return client.get().messages().create(params);
+        }
+        MessageAccumulator accumulator = MessageAccumulator.create();
+        try (StreamResponse<RawMessageStreamEvent> stream = client.get().messages().createStreaming(params)) {
+            stream.stream().forEach(event -> {
+                accumulator.accumulate(event);
+                event.contentBlockDelta()
+                        .flatMap(delta -> delta.delta().text())
+                        .ifPresent(text -> listener.onText(text.text()));
+            });
+        }
+        return accumulator.message();
+    }
+
     // 응답에 들어 있는 tool_use 를 모두 실행하고, 결과를 tool_result 묶음(하나의 user 메시지)으로 만든다
-    private List<ContentBlockParam> runTools(Message response, PharmacyTools.Session session) {
+    private List<ContentBlockParam> runTools(Message response, PharmacyTools.Session session, AiSearchListener listener) {
         List<ContentBlockParam> results = new ArrayList<>();
         for (ContentBlock block : response.content()) {
             Optional<ToolUseBlock> toolUse = block.toolUse();
@@ -145,6 +171,7 @@ public class AiSearchService {
                 continue;
             }
             ToolUseBlock call = toolUse.get();
+            listener.onStep(PharmacyTools.describe(call.name(), call._input()));
             ToolResultBlockParam.Builder result = ToolResultBlockParam.builder().toolUseId(call.id());
             try {
                 result.content(tools.execute(call.name(), call._input(), session));
