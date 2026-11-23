@@ -10,6 +10,7 @@ import com.anthropic.models.messages.OutputConfig;
 import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.ToolResultBlockParam;
 import com.anthropic.models.messages.ToolUseBlock;
+import com.example.pharmacy.hours.PharmacyHoursService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -47,25 +48,39 @@ public class AiSearchService {
             - 문장에 위치가 없으면 도구를 부르지 말고, 어디 근처에서 찾을지 한 문장으로 되묻는다.
             - 반경: '바로 앞', '걸어서' 같은 말이면 1000, 특별한 말이 없으면 3000, '멀어도 괜찮아' 같은 말이면 10000.
             - 개수: 특별한 말이 없으면 3, 최대 5.
-            - 이 서비스에는 영업시간, 휴무일, 24시간 여부 데이터가 없다. '지금 문 연', '24시', '일요일', '심야' 같은 조건을 물으면
-              가까운 약국은 찾아 주되, 영업 여부는 확인할 수 없으니 방문 전에 전화로 확인하라고 분명히 말한다. 영업 여부를 지어내지 않는다.
+            %s
             - 약 추천, 진단 같은 의료 조언은 하지 않는다. 증상을 말하면 약사와 상담하라고 안내하고,
               숨이 차거나 가슴 통증처럼 위급해 보이면 119 나 응급실을 먼저 안내한다.
             - 약국 이름, 주소, 거리는 도구 결과에 있는 것만 말한다.
             - 약국 찾기와 상관없는 요청에는 이 서비스는 약국 찾기만 돕는다고 짧게 답한다.
             """;
 
+    // 영업시간 데이터가 있을 때 / 없을 때 규칙
+    static final String HOURS_RULE_ON = """
+            - 영업시간: '지금 문 연', '24시', '일요일 밤', '새벽', '공휴일' 처럼 시간 조건이 있으면 search_pharmacies 대신 search_open_pharmacies 를 쓴다.
+              '지금'은 사용자 메시지 앞의 [현재 한국 시각] 을 기준으로 요일 번호와 HHMM 을 정한다. '오늘이 공휴일'인지는 알 수 없으니
+              사용자가 공휴일이라고 말할 때만 day=8 을 쓴다. 결과가 0곳이면 반경을 넓혀 한 번 더 찾아본다.
+              영업시간은 공공데이터 기준이라 실제와 다를 수 있으니 방문 전에 전화로 확인하라고 한 문장 덧붙인다.""";
+    static final String HOURS_RULE_OFF = """
+            - 이 서비스에는 지금 영업시간 데이터가 없다. '지금 문 연', '24시', '일요일', '심야' 같은 조건을 물으면
+              가까운 약국은 찾아 주되, 영업 여부는 확인할 수 없으니 방문 전에 전화로 확인하라고 분명히 말한다. 영업 여부를 지어내지 않는다.""";
+
     private final Optional<AnthropicClient> client;
     private final PharmacyTools tools;
+    private final PharmacyHoursService hoursService;
     private final String model;
 
     public AiSearchService(Optional<AnthropicClient> client,
                            PharmacyTools tools,
+                           PharmacyHoursService hoursService,
                            @Value("${anthropic.model:claude-opus-5-5}") String model) {
         this.client = client;
         this.tools = tools;
+        this.hoursService = hoursService;
         this.model = model;
     }
+
+    private static final String[] DAY_KO = {"", "월", "화", "수", "목", "금", "토", "일"};
 
     // 키가 없으면 AI 검색은 꺼진 상태 (주소 검색은 그대로 동작)
     public boolean isEnabled() {
@@ -77,14 +92,23 @@ public class AiSearchService {
             return AiSearchResult.message("AI 검색이 지금은 꺼져 있어요. 아래 주소 검색을 이용해 주세요.");
         }
 
+        boolean hoursOn = hoursService.isAvailable();
+        PharmacyHoursService.Now now = hoursService.now();
+        // 시스템 프롬프트는 고정(캐시에 유리)하고, 바뀌는 현재 시각은 사용자 메시지 앞에 붙인다
+        String userMessage = "[현재 한국 시각: %s %s요일(요일 번호 %d) %02d:%02d]\n%s".formatted(
+                now.dateTime().toLocalDate(), DAY_KO[now.day()], now.day(), now.hhmm() / 100, now.hhmm() % 100, query);
+
         MessageCreateParams.Builder request = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(MAX_TOKENS)
-                .system(SYSTEM_PROMPT)
+                .system(SYSTEM_PROMPT.formatted(hoursOn ? HOURS_RULE_ON : HOURS_RULE_OFF))
                 // 간단한 길찾기라 깊게 생각할 필요가 없다. effort 를 낮춰 비용과 대기 시간을 줄인다.
                 .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
-                .addUserMessage(query);
+                .addUserMessage(userMessage);
         tools.definitions().forEach(request::addTool);
+        if (hoursOn) {
+            request.addTool(tools.openHoursDefinition());
+        }
 
         PharmacyTools.Session session = new PharmacyTools.Session();
         try {

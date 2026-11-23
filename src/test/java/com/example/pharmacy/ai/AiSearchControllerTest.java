@@ -2,7 +2,7 @@ package com.example.pharmacy.ai;
 
 import com.example.pharmacy.direction.dto.OutputDto;
 import com.example.pharmacy.direction.entity.Direction;
-import com.example.pharmacy.direction.service.DirectionService;
+import com.example.pharmacy.direction.view.ResultViewAssembler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -34,7 +34,7 @@ class AiSearchControllerTest {
     @MockBean
     private AiUsageLimiter usageLimiter;
     @MockBean
-    private DirectionService directionService;
+    private ResultViewAssembler resultViewAssembler;
 
     @Test
     void AI_답변과_약국_표를_보여_준다() throws Exception {
@@ -42,9 +42,10 @@ class AiSearchControllerTest {
         given(aiSearchService.isEnabled()).willReturn(true);
         given(usageLimiter.tryAcquire("203.0.113.7")).willReturn(true);
         given(aiSearchService.search("강남역 근처 약국")).willReturn(new AiSearchResult("3곳을 찾았어요.", List.of(d)));
-        given(directionService.toOutput(d)).willReturn(
+        given(resultViewAssembler.toOutputs(List.of(d))).willReturn(List.of(
                 new OutputDto("온누리약국", "서울 강남구", "210m", "/dir/1",
-                        "https://map.kakao.com/link/roadview/1,2", "02-555-0100", null));
+                        "https://map.kakao.com/link/roadview/1,2", "02-555-0100", null,
+                        "오늘(월) 09:00~22:00", true)));
 
         mockMvc.perform(post("/ai-search").param("query", "  강남역 근처 약국 ")
                         .header("X-Forwarded-For", "203.0.113.7, 10.0.0.1"))
@@ -53,7 +54,9 @@ class AiSearchControllerTest {
                 .andExpect(model().attribute("answer", "3곳을 찾았어요."))
                 .andExpect(model().attribute("outputs", hasSize(1)))
                 .andExpect(content().string(containsString("온누리약국")))
-                .andExpect(content().string(containsString("tel:02-555-0100")));
+                .andExpect(content().string(containsString("tel:02-555-0100")))
+                .andExpect(content().string(containsString("영업 중")))
+                .andExpect(content().string(containsString("오늘(월) 09:00~22:00")));
     }
 
     @Test
